@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "truth-debate"
+version = "0.1.0"
+description = "End-to-end experiments for RL-trained truth-seeking multi-agent debate with anti-conformity protocols."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Truth Debate Contributors" }]
+dependencies = [
+  "accelerate>=0.33.0",
+  "datasets>=2.20.0",
+  "matplotlib>=3.8.0",
+  "numpy>=1.26.0",
+  "pandas>=2.2.0",
+  "peft>=0.12.0",
+  "protobuf>=4.25.0",
+  "pyyaml>=6.0.1",
+  "safetensors>=0.4.3",
+  "sentencepiece>=0.2.0",
+  "torch>=2.3.0",
+  "tqdm>=4.66.0",
+  "transformers>=4.44.0,<5.0.0"
+]
+
+[project.scripts]
+truth-debate = "truth_debate.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
