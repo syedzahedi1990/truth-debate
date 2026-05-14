@@ -6,6 +6,7 @@ from pathlib import Path
 from .config import load_config, set_seed, write_resolved_config
 from .data import build_datasets
 from .evaluate import run_evaluation
+from .preflight import download_model, run_preflight
 from .report import build_report
 from .train_rl import run_rl_training
 
@@ -14,10 +15,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Truth-seeking multi-agent debate experiments")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    for name in ["run", "make-data", "eval", "train"]:
+    for name in ["run", "make-data", "eval", "train", "preflight"]:
         p = sub.add_parser(name)
         p.add_argument("--config", default="configs/quick.yaml")
         p.add_argument("--output", default="runs/debug")
+    p_download = sub.add_parser("download-model")
+    p_download.add_argument("--config", default="configs/quick.yaml")
+    p_download.add_argument("--local-dir", default=None)
     p_report = sub.add_parser("report")
     p_report.add_argument("--output", default="runs/debug")
 
@@ -30,6 +34,15 @@ def main() -> None:
 
     cfg = load_config(args.config)
     set_seed(int(cfg["seed"]))
+
+    if args.cmd == "preflight":
+        run_preflight(cfg)
+        return
+
+    if args.cmd == "download-model":
+        download_model(cfg, local_dir=args.local_dir)
+        return
+
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
     write_resolved_config(cfg, output)

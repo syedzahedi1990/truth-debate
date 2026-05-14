@@ -31,6 +31,7 @@ git clone <your-repo-url> truth-debate
 cd truth-debate
 bash scripts/bootstrap_vast.sh
 source .venv/bin/activate
+truth-debate preflight --config configs/vast_0_5b.yaml
 bash scripts/run_end_to_end.sh configs/vast_0_5b.yaml
 ```
 
@@ -38,6 +39,20 @@ For gated models, set `HF_TOKEN` before running:
 
 ```bash
 export HF_TOKEN=...
+```
+
+If the instance cannot reach Hugging Face, the run will fail before loading the model. Check:
+
+```bash
+curl -I https://huggingface.co
+truth-debate preflight --config configs/vast_0_5b.yaml
+```
+
+If `curl` says the network is unreachable, the instance/container has no outbound route. Rent or restart a Vast.ai instance with public internet enabled, or pre-download the model elsewhere and point the config at the copied local directory:
+
+```bash
+truth-debate download-model --config configs/vast_0_5b.yaml --local-dir models/qwen2.5-0.5b-instruct
+# then set model.name: models/qwen2.5-0.5b-instruct
 ```
 
 Outputs are written to `runs/<timestamp>/`:

@@ -18,10 +18,13 @@ class HFGenerator:
         self.torch = torch
         self.model_cfg = model_cfg
         self.model_name = str(model_cfg["name"])
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_name,
-            trust_remote_code=bool(model_cfg.get("trust_remote_code", False)),
-        )
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name,
+                trust_remote_code=bool(model_cfg.get("trust_remote_code", False)),
+            )
+        except OSError as exc:
+            raise RuntimeError(_model_load_help(self.model_name)) from exc
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -37,13 +40,16 @@ class HFGenerator:
                 bnb_4bit_use_double_quant=True,
             )
 
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
-            torch_dtype=dtype,
-            device_map="auto",
-            quantization_config=quantization_config,
-            trust_remote_code=bool(model_cfg.get("trust_remote_code", False)),
-        )
+        try:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                torch_dtype=dtype,
+                device_map="auto",
+                quantization_config=quantization_config,
+                trust_remote_code=bool(model_cfg.get("trust_remote_code", False)),
+            )
+        except OSError as exc:
+            raise RuntimeError(_model_load_help(self.model_name)) from exc
 
         if trainable_lora:
             from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
@@ -150,3 +156,13 @@ def _resolve_dtype(torch, dtype_name: str):
     if dtype_name == "float32":
         return torch.float32
     raise ValueError(f"Unknown dtype: {dtype_name}")
+
+
+def _model_load_help(model_name: str) -> str:
+    return (
+        f"Could not load model '{model_name}'. If this happened on Vast.ai, the instance/container "
+        "probably cannot reach huggingface.co or the model is not cached. Run "
+        "`truth-debate preflight --config <config>` to verify networking. If networking is unavailable, "
+        "download the model on a machine with internet, copy it to the instance, and set `model.name` "
+        "in the config to that local directory."
+    )
