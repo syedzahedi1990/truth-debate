@@ -1,0 +1,61 @@
+seed: 1618
+
+model:
+  name: Qwen/Qwen2.5-0.5B-Instruct
+  dtype: bfloat16
+  load_in_4bit: false
+  trust_remote_code: false
+  max_new_tokens: 128
+  temperature: 0.35
+  top_p: 0.9
+
+data:
+  kind: gsm8k
+  train_size: 400
+  eval_size: 100
+  max_value: 12
+  min_terms: 3
+  max_terms: 4
+  trap_fraction: 0.75
+
+debate:
+  protocols: [single, vanilla_debate, anti_conformity]
+  agents: 3
+  rounds: 1
+  max_new_tokens: 128
+  temperature: 0.35
+  top_p: 0.9
+
+reward:
+  correct: 1.0
+  wrong: -0.3
+  parse_failure: -2.0
+  escape_wrong_majority: 0.8
+  join_wrong_majority: -0.8
+  correct_to_wrong_flip: -1.0
+  format_bonus: 0.2
+  confidence_calibration: 0.05
+
+training:
+  enabled: true
+  sft_warmup_steps: 200
+  steps: 120
+  batch_size: 2
+  lr: 0.00005
+  grad_clip: 1.0
+  baseline_ema: 0.9
+  save_every: 60
+  curriculum:
+    wrong_majority: true
+    mix:
+      oracle_private_wrong_majority: 0.35
+      model_private_wrong_majority: 0.45
+      model_private_mixed_peers: 0.20
+  lora:
+    r: 16
+    alpha: 32
+    dropout: 0.05
+    target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+evaluation:
+  max_tasks: 100

@@ -196,7 +196,7 @@ def load_gsm8k(split: str, n: int, seed: int) -> list[Task]:
                 question=question,
                 answer=answer,
                 category="gsm8k",
-                meta={"source": "gsm8k"},
+                meta={"source": "gsm8k", "answer_rationale": row["answer"]},
             )
         )
     return tasks

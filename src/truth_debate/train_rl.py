@@ -8,7 +8,7 @@ from typing import Any
 
 from tqdm import trange
 
-from .curriculum import curriculum_enabled, oracle_private_answer, supervised_examples, wrong_majority_peers
+from .curriculum import curriculum_enabled, sample_curriculum_case, supervised_examples
 from .data import build_datasets, read_tasks
 from .llm import HFGenerator
 from .prompts import private_answer_messages, rl_final_messages
@@ -67,8 +67,19 @@ def run_rl_training(cfg: dict[str, Any], output_dir: str | Path) -> Path:
             for _ in range(batch_size):
                 task = rng.choice(tasks)
                 if use_curriculum:
-                    own_initial = oracle_private_answer(task)
-                    peers = wrong_majority_peers(task, n_agents - 1, rng)
+                    model_private = model.generate(
+                        private_answer_messages(task, agent_id=0),
+                        max_new_tokens=int(cfg["debate"]["max_new_tokens"]),
+                        temperature=float(cfg["debate"]["temperature"]),
+                        top_p=float(cfg["debate"]["top_p"]),
+                    )
+                    own_initial, peers, curriculum_mode = sample_curriculum_case(
+                        task=task,
+                        n_agents=n_agents,
+                        rng=rng,
+                        cfg=cfg,
+                        model_private_response=model_private,
+                    )
                 else:
                     own_initial = model.generate(
                         private_answer_messages(task, agent_id=0),
@@ -85,6 +96,7 @@ def run_rl_training(cfg: dict[str, Any], output_dir: str | Path) -> Path:
                         )
                         for i in range(1, n_agents)
                     ]
+                    curriculum_mode = "none"
                 final_messages = rl_final_messages(task, own_initial, peers)
                 final_prompt = model.format_messages(final_messages)
                 final_response = model.generate(
@@ -112,6 +124,7 @@ def run_rl_training(cfg: dict[str, Any], output_dir: str | Path) -> Path:
                         "advantage": float(advantage),
                         "tokens": n_tokens,
                         "wrong_majority_curriculum": use_curriculum,
+                        "curriculum_mode": curriculum_mode,
                     }
                 )
 

@@ -1,7 +1,13 @@
 import json
 import zipfile
 
-from truth_debate.curriculum import plausible_wrong_answer, supervised_examples, wrong_majority_peers
+from truth_debate.curriculum import (
+    arithmetic_rationale,
+    plausible_wrong_answer,
+    sample_curriculum_case,
+    supervised_examples,
+    wrong_majority_peers,
+)
 from truth_debate.data import Task, eval_left_to_right, safe_eval_expr
 from truth_debate.parsing import has_required_format, parse_answer, parse_confidence
 from truth_debate.rescore import rescore_run
@@ -55,6 +61,7 @@ def test_strict_answer_parser_cases():
     assert parse_answer("1. PRIVATE_ANSWER: 34") is None
     assert parse_answer(r"\boxed{915}") == "915"
     assert parse_answer('{"answer": -4408, "confidence": 0.91}') == "-4408"
+    assert parse_answer('{"answer": 14.0, "confidence": 0.91}') == "14"
     assert parse_confidence('{"answer": -4408, "confidence": 0.91}') == 0.91
     assert has_required_format('{"answer": -4408, "confidence": 0.91}')
     assert parse_answer('{"answer": 20, "confidence": 0.8}\n{"answer": 14, "confidence": 0.9}') == "14"
@@ -78,6 +85,40 @@ def test_wrong_majority_curriculum_uses_plausible_wrong_answer():
     assert wrong == "20"
     assert all(parse_answer(peer) == "20" for peer in peers)
     assert any(parse_answer(completion) == "14" for _, completion in examples)
+    assert arithmetic_rationale("2 + 3 * 4", "14") == "3*4=12; 2 + 12=14"
+
+
+def test_mixed_curriculum_can_use_model_private_answer():
+    import random
+
+    task = Task(
+        id="t2",
+        question="Expression: 2 + 3 * 4",
+        answer="14",
+        category="precedence_trap",
+        meta={"left_to_right_answer": "20", "expression": "2 + 3 * 4"},
+    )
+    cfg = {
+        "training": {
+            "curriculum": {
+                "mix": {
+                    "oracle_private_wrong_majority": 0.0,
+                    "model_private_wrong_majority": 1.0,
+                    "model_private_mixed_peers": 0.0,
+                }
+            }
+        }
+    }
+    own, peers, mode = sample_curriculum_case(
+        task=task,
+        n_agents=3,
+        rng=random.Random(1),
+        cfg=cfg,
+        model_private_response='{"answer": 14, "confidence": 0.7}',
+    )
+    assert mode == "model_private_wrong_majority"
+    assert parse_answer(own) == "14"
+    assert [parse_answer(peer) for peer in peers] == ["20", "20"]
 
 
 def test_rescore_reads_zip_without_extracting(tmp_path):

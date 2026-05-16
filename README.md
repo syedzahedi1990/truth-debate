@@ -87,6 +87,26 @@ The v2 config changes the experiment in three ways:
 
 Do not scale until the smoke run has parse failure below about 5%, anti-conformity reward activation well above the first run's 0.17%, and no post-training accuracy collapse.
 
+## V3 Computation SFT And Benchmark Run
+
+V3 targets the failure mode found in V2: the model learned valid JSON but still computed private answers poorly. It adds exact computation rationales during SFT and mixes oracle-private and model-private RL curriculum cases.
+
+Run the controlled debugging benchmark first:
+
+```bash
+truth-debate run --config configs/v3_synthetic_smoke.yaml --output runs/v3_synthetic_smoke
+truth-debate rescore --source runs/v3_synthetic_smoke --output runs/v3_synthetic_smoke_rescored
+```
+
+Then run the standard-benchmark smoke on GSM8K:
+
+```bash
+truth-debate run --config configs/v3_gsm8k_smoke.yaml --output runs/v3_gsm8k_smoke
+truth-debate rescore --source runs/v3_gsm8k_smoke --output runs/v3_gsm8k_smoke_rescored
+```
+
+The synthetic benchmark is for controlled debugging. GSM8K is the standard benchmark sanity check; the smoke config uses a subset before a full benchmark run.
+
 Useful subcommands:
 
 ```bash

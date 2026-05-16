@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from .data import Task
 
 
@@ -99,12 +101,13 @@ def _format_peers(peer_messages: list[str]) -> str:
 
 
 def json_private_answer(answer: str | int, confidence: float = 0.95, rationale: str = "computed with standard order of operations") -> str:
-    return (
-        '{"answer": '
-        f"{int(answer)}, "
-        f'"confidence": {confidence:.2f}, '
-        f'"rationale": "{rationale}"'
-        "}"
+    return json.dumps(
+        {
+            "answer": int(answer),
+            "confidence": round(float(confidence), 4),
+            "rationale": rationale,
+        },
+        separators=(",", ":"),
     )
 
 
@@ -114,13 +117,14 @@ def json_anti_conformity_answer(
     wrong_majority_answer: str | int,
     confidence: float = 0.95,
 ) -> str:
-    return (
-        '{"private_answer": '
-        f"{int(private_answer)}, "
-        '"majority_risk": "the peer majority may be using a precedence or arithmetic shortcut", '
-        '"error_check": "recompute multiplication before addition and subtraction", '
-        f'"minority_report": "wrong majority answer was {int(wrong_majority_answer)}", '
-        f'"answer": {int(answer)}, '
-        f'"confidence": {confidence:.2f}'
-        "}"
+    return json.dumps(
+        {
+            "private_answer": int(private_answer),
+            "majority_risk": "the peer majority may be using a precedence or arithmetic shortcut",
+            "error_check": "recompute multiplication before addition and subtraction",
+            "minority_report": f"wrong majority answer was {int(wrong_majority_answer)}",
+            "answer": int(answer),
+            "confidence": round(float(confidence), 4),
+        },
+        separators=(",", ":"),
     )

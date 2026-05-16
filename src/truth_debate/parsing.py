@@ -73,7 +73,12 @@ def parse_answer_legacy(text: str) -> str | None:
 
 
 def normalize_int(value: str | int) -> str:
-    return str(int(str(value).replace(",", "")))
+    if isinstance(value, float):
+        return str(int(value))
+    clean = str(value).replace(",", "").strip()
+    if "." in clean:
+        return str(int(float(clean)))
+    return str(int(clean))
 
 
 def parse_confidence(text: str) -> float | None:

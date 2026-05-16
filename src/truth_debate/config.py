@@ -73,6 +73,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         },
         "curriculum": {
             "wrong_majority": False,
+            "mix": {
+                "oracle_private_wrong_majority": 0.4,
+                "model_private_wrong_majority": 0.4,
+                "model_private_mixed_peers": 0.2,
+            },
         },
     },
     "evaluation": {"max_tasks": None},
