@@ -106,7 +106,7 @@ def generate_arithmetic_tasks(
         category = "precedence_trap" if true_answer != ltr_answer else "arithmetic"
         question = (
             "Compute this expression exactly using standard mathematical order of operations. "
-            "Give the final integer in the form ANSWER: <integer>.\n\n"
+            'Return the final integer as JSON with an "answer" field.\n\n'
             f"Expression: {expr}"
         )
         tasks.append(
@@ -187,8 +187,7 @@ def load_gsm8k(split: str, n: int, seed: int) -> list[Task]:
     for idx, row in enumerate(ds):
         answer = _extract_gsm8k_answer(row["answer"])
         question = (
-            "Solve this grade-school math problem. Give the final integer in the form "
-            "ANSWER: <integer>.\n\n"
+            'Solve this grade-school math problem. Return the final integer as JSON with an "answer" field.\n\n'
             f"Problem: {row['question']}"
         )
         tasks.append(

@@ -70,6 +70,23 @@ Outputs are written to `runs/<timestamp>/`:
 truth-debate run --config configs/vast_0_5b.yaml --output runs/my_run
 ```
 
+## V2 Smoke Run
+
+After the first diagnostic run, use the v2 smoke config before spending money on a long A100 run:
+
+```bash
+truth-debate run --config configs/v2_smoke.yaml --output runs/v2_smoke
+truth-debate rescore --source runs/v2_smoke --output runs/v2_smoke_rescored
+```
+
+The v2 config changes the experiment in three ways:
+
+- all prompts ask for one JSON object with `answer` and `confidence`;
+- supervised warmup teaches the output format before RL;
+- RL uses an oracle wrong-majority curriculum so the anti-conformity reward is active.
+
+Do not scale until the smoke run has parse failure below about 5%, anti-conformity reward activation well above the first run's 0.17%, and no post-training accuracy collapse.
+
 Useful subcommands:
 
 ```bash

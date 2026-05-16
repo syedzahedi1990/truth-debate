@@ -1,8 +1,9 @@
 import json
 import zipfile
 
+from truth_debate.curriculum import plausible_wrong_answer, supervised_examples, wrong_majority_peers
 from truth_debate.data import Task, eval_left_to_right, safe_eval_expr
-from truth_debate.parsing import parse_answer
+from truth_debate.parsing import has_required_format, parse_answer, parse_confidence
 from truth_debate.rescore import rescore_run
 from truth_debate.reward import compute_reward
 
@@ -53,6 +54,30 @@ def test_strict_answer_parser_cases():
     assert parse_answer("CONFIDENCE: 100%") is None
     assert parse_answer("1. PRIVATE_ANSWER: 34") is None
     assert parse_answer(r"\boxed{915}") == "915"
+    assert parse_answer('{"answer": -4408, "confidence": 0.91}') == "-4408"
+    assert parse_confidence('{"answer": -4408, "confidence": 0.91}') == 0.91
+    assert has_required_format('{"answer": -4408, "confidence": 0.91}')
+    assert parse_answer('{"answer": 20, "confidence": 0.8}\n{"answer": 14, "confidence": 0.9}') == "14"
+
+
+def test_wrong_majority_curriculum_uses_plausible_wrong_answer():
+    import random
+
+    task = Task(
+        id="t1",
+        question="Expression: 2 + 3 * 4",
+        answer="14",
+        category="precedence_trap",
+        meta={"left_to_right_answer": "20", "expression": "2 + 3 * 4"},
+    )
+    rng = random.Random(0)
+    wrong = plausible_wrong_answer(task, rng)
+    peers = wrong_majority_peers(task, 2, rng)
+    examples = supervised_examples(task, 2, rng)
+
+    assert wrong == "20"
+    assert all(parse_answer(peer) == "20" for peer in peers)
+    assert any(parse_answer(completion) == "14" for _, completion in examples)
 
 
 def test_rescore_reads_zip_without_extracting(tmp_path):

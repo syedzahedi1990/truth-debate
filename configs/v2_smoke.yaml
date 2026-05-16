@@ -1,0 +1,57 @@
+seed: 314
+
+model:
+  name: Qwen/Qwen2.5-0.5B-Instruct
+  dtype: bfloat16
+  load_in_4bit: true
+  trust_remote_code: false
+  max_new_tokens: 96
+  temperature: 0.4
+  top_p: 0.9
+
+data:
+  kind: synthetic_arithmetic
+  train_size: 200
+  eval_size: 50
+  max_value: 30
+  min_terms: 3
+  max_terms: 5
+  trap_fraction: 0.8
+
+debate:
+  protocols: [single, vanilla_debate, anti_conformity]
+  agents: 3
+  rounds: 1
+  max_new_tokens: 96
+  temperature: 0.4
+  top_p: 0.9
+
+reward:
+  correct: 1.0
+  wrong: -0.3
+  parse_failure: -2.0
+  escape_wrong_majority: 0.8
+  join_wrong_majority: -0.8
+  correct_to_wrong_flip: -1.0
+  format_bonus: 0.2
+  confidence_calibration: 0.05
+
+training:
+  enabled: true
+  sft_warmup_steps: 60
+  steps: 100
+  batch_size: 2
+  lr: 0.00005
+  grad_clip: 1.0
+  baseline_ema: 0.9
+  save_every: 50
+  curriculum:
+    wrong_majority: true
+  lora:
+    r: 16
+    alpha: 32
+    dropout: 0.05
+    target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+evaluation:
+  max_tasks: 50

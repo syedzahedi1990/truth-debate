@@ -5,7 +5,8 @@ from .data import Task
 
 SYSTEM = (
     "You are a careful mathematical debater. Your goal is truth, not agreement. "
-    "Use concise reasoning. Always end with ANSWER: <integer> and CONFIDENCE: <0-100>."
+    "Use concise reasoning. Return exactly one JSON object and no Markdown. "
+    'The JSON must include "answer" as an integer and "confidence" as a number from 0 to 1.'
 )
 
 
@@ -17,7 +18,7 @@ def private_answer_messages(task: Task, agent_id: int | None = None) -> list[dic
             "role": "user",
             "content": (
                 f"{agent}, independently solve the task before seeing any peer answers. "
-                "State the key operation-order assumption you used.\n\n"
+                'Return exactly {"answer": <integer>, "confidence": <0-1>, "rationale": "<short check>"}.\n\n'
                 f"{task.question}"
             ),
         },
@@ -36,7 +37,8 @@ def vanilla_update_messages(task: Task, own_previous: str, peer_messages: list[s
                 f"Task:\n{task.question}\n\n"
                 f"Your previous answer:\n{own_previous}\n\n"
                 f"Other agents:\n{peers}\n\n"
-                "Give your updated solution. End with ANSWER and CONFIDENCE."
+                'Give your updated solution as exactly one JSON object: '
+                '{"answer": <integer>, "confidence": <0-1>, "rationale": "<short check>"}'
             ),
         },
     ]
@@ -61,13 +63,9 @@ def anti_conformity_update_messages(
                 f"Task:\n{task.question}\n\n"
                 f"Your private commitment:\n{own_commitment}\n\n"
                 f"Peer commitments and arguments:\n{peers}\n\n"
-                "Respond with these fields:\n"
-                "1. PRIVATE_ANSWER: your original answer.\n"
-                "2. MAJORITY_RISK: one sentence on how the majority could be wrong.\n"
-                "3. ERROR_CHECK: the exact arithmetic/order-of-operations check.\n"
-                "4. MINORITY_REPORT: the best non-majority answer if any.\n"
-                "5. ANSWER: <integer>\n"
-                "6. CONFIDENCE: <0-100>"
+                "Respond as exactly one JSON object with these keys: "
+                '"private_answer", "majority_risk", "error_check", "minority_report", "answer", "confidence". '
+                '"answer" must be an integer and "confidence" must be a number from 0 to 1.'
             ),
         },
     ]
@@ -86,8 +84,9 @@ def rl_final_messages(task: Task, own_commitment: str, peer_messages: list[str])
                 f"Task:\n{task.question}\n\n"
                 f"Your private commitment:\n{own_commitment}\n\n"
                 f"Peer answers:\n{peers}\n\n"
-                "Now produce the final anti-conformity response with MAJORITY_RISK, ERROR_CHECK, "
-                "ANSWER, and CONFIDENCE."
+                "Now produce exactly one JSON object with keys "
+                '"private_answer", "majority_risk", "error_check", "minority_report", "answer", "confidence". '
+                '"answer" must be an integer and "confidence" must be a number from 0 to 1.'
             ),
         },
     ]
@@ -97,3 +96,31 @@ def _format_peers(peer_messages: list[str]) -> str:
     if not peer_messages:
         return "No peer messages."
     return "\n\n".join(f"Peer {idx + 1}:\n{msg}" for idx, msg in enumerate(peer_messages))
+
+
+def json_private_answer(answer: str | int, confidence: float = 0.95, rationale: str = "computed with standard order of operations") -> str:
+    return (
+        '{"answer": '
+        f"{int(answer)}, "
+        f'"confidence": {confidence:.2f}, '
+        f'"rationale": "{rationale}"'
+        "}"
+    )
+
+
+def json_anti_conformity_answer(
+    answer: str | int,
+    private_answer: str | int,
+    wrong_majority_answer: str | int,
+    confidence: float = 0.95,
+) -> str:
+    return (
+        '{"private_answer": '
+        f"{int(private_answer)}, "
+        '"majority_risk": "the peer majority may be using a precedence or arithmetic shortcut", '
+        '"error_check": "recompute multiplication before addition and subtraction", '
+        f'"minority_report": "wrong majority answer was {int(wrong_majority_answer)}", '
+        f'"answer": {int(answer)}, '
+        f'"confidence": {confidence:.2f}'
+        "}"
+    )

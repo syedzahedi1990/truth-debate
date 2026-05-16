@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 import re
 
 
 INT_VALUE = r"([+-]?\d[\d,]*)"
+JSON_ANSWER_RE = re.compile(rf'"answer"\s*:\s*"?{INT_VALUE}"?', re.IGNORECASE)
+JSON_CONF_RE = re.compile(r'"confidence"\s*:\s*"?(\d+(?:\.\d+)?)"?', re.IGNORECASE)
 ANSWER_RE = re.compile(rf"(?<![A-Za-z_])ANSWER\s*[:=]\s*(?:<integer>\s*[:=]?\s*)?\**\s*{INT_VALUE}", re.IGNORECASE)
 FINAL_RE = re.compile(
     rf"\bfinal\s+(?:answer|integer|result)\s*(?:(?:is|:|=)\s*)?(?:[:=]\s*)?(?:<integer>\s*[:=]?\s*)?\**\s*{INT_VALUE}",
@@ -27,6 +30,10 @@ def parse_answer(text: str) -> str | None:
     fallback because debate outputs often contain confidence values, numbered
     lists, and quoted peer answers that are not the model's final answer.
     """
+    json_answer = _parse_json_answer(text)
+    if json_answer is not None:
+        return json_answer
+
     candidates: list[tuple[int, int, str]] = []
     lines = text.splitlines()
     for line_idx, line in enumerate(lines):
@@ -70,6 +77,9 @@ def normalize_int(value: str | int) -> str:
 
 
 def parse_confidence(text: str) -> float | None:
+    json_conf = _parse_json_confidence(text)
+    if json_conf is not None:
+        return json_conf
     match = CONF_RE.search(text)
     if not match:
         return None
@@ -80,6 +90,8 @@ def parse_confidence(text: str) -> float | None:
 
 
 def has_required_format(text: str) -> bool:
+    if _parse_json_answer(text) is not None and _parse_json_confidence(text) is not None:
+        return True
     return ANSWER_RE.search(text) is not None and CONF_RE.search(text) is not None
 
 
@@ -106,3 +118,72 @@ def _parse_next_line_value(lines: list[str]) -> str | None:
         match = NEXT_LINE_VALUE_RE.search(clean)
         return normalize_int(match.group(1)) if match else None
     return None
+
+
+def _parse_json_answer(text: str) -> str | None:
+    parsed_answers: list[str] = []
+    for obj in _json_objects(text):
+        answer = obj.get("answer")
+        if isinstance(answer, (int, float, str)):
+            try:
+                parsed_answers.append(normalize_int(answer))
+            except ValueError:
+                pass
+    if parsed_answers:
+        return parsed_answers[-1]
+    matches = JSON_ANSWER_RE.findall(text)
+    if matches:
+        return normalize_int(matches[-1])
+    return None
+
+
+def _parse_json_confidence(text: str) -> float | None:
+    parsed_confidences: list[float] = []
+    for obj in _json_objects(text):
+        conf = obj.get("confidence")
+        if isinstance(conf, (int, float, str)):
+            try:
+                value = float(conf)
+            except ValueError:
+                continue
+            if value > 1:
+                value /= 100.0
+            parsed_confidences.append(max(0.0, min(1.0, value)))
+    if parsed_confidences:
+        return parsed_confidences[-1]
+    matches = JSON_CONF_RE.findall(text)
+    if not matches:
+        return None
+    value = float(matches[-1])
+    if value > 1:
+        value /= 100.0
+    return max(0.0, min(1.0, value))
+
+
+def _json_objects(text: str) -> list[dict]:
+    objects: list[dict] = []
+    for candidate in _json_object_strings(text):
+        try:
+            obj = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            objects.append(obj)
+    return objects
+
+
+def _json_object_strings(text: str) -> list[str]:
+    spans: list[str] = []
+    depth = 0
+    start: int | None = None
+    for idx, char in enumerate(text):
+        if char == "{":
+            if depth == 0:
+                start = idx
+            depth += 1
+        elif char == "}" and depth > 0:
+            depth -= 1
+            if depth == 0 and start is not None:
+                spans.append(text[start : idx + 1])
+                start = None
+    return spans

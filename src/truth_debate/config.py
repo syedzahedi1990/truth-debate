@@ -50,6 +50,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
     "training": {
         "enabled": True,
+        "sft_warmup_steps": 0,
         "steps": 100,
         "batch_size": 1,
         "lr": 3e-5,
@@ -69,6 +70,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
                 "up_proj",
                 "down_proj",
             ],
+        },
+        "curriculum": {
+            "wrong_majority": False,
         },
     },
     "evaluation": {"max_tasks": None},
