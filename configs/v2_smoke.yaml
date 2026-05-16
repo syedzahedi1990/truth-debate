@@ -3,7 +3,7 @@ seed: 314
 model:
   name: Qwen/Qwen2.5-0.5B-Instruct
   dtype: bfloat16
-  load_in_4bit: true
+  load_in_4bit: false
   trust_remote_code: false
   max_new_tokens: 96
   temperature: 0.4

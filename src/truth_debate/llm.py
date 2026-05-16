@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import importlib.util
 
 
 class HFGenerator:
@@ -31,6 +32,12 @@ class HFGenerator:
         dtype = _resolve_dtype(torch, str(model_cfg.get("dtype", "auto")))
         quantization_config = None
         if bool(model_cfg.get("load_in_4bit", False)):
+            if importlib.util.find_spec("bitsandbytes") is None:
+                raise RuntimeError(
+                    "Config has model.load_in_4bit=true, but bitsandbytes is not installed in this Python environment. "
+                    "Install it with `python -m pip install bitsandbytes`, run `python -m pip install -r requirements-vast.txt`, "
+                    "or set `model.load_in_4bit: false` for small models on large GPUs."
+                )
             from transformers import BitsAndBytesConfig
 
             quantization_config = BitsAndBytesConfig(
