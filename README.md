@@ -77,7 +77,11 @@ truth-debate make-data --config configs/quick.yaml --output runs/debug
 truth-debate eval --config configs/quick.yaml --output runs/debug
 truth-debate train --config configs/quick.yaml --output runs/debug
 truth-debate report --output runs/debug
+truth-debate rescore --source runs/my_run --output runs/my_run_rescored
+truth-debate rescore --source 20260514_110718.zip --output runs/20260514_110718_rescored
 ```
+
+Use `rescore` on completed runs when parser behavior changes. It reads rollouts from either a run directory or zip archive and writes `rescored_metrics/` plus `rescored_report.md` without modifying the original run.
 
 ## Research Hypotheses
 

@@ -31,7 +31,7 @@ def build_report(output_dir: str | Path) -> Path:
                 "",
                 f"- n: {metrics.get('n', 0)}",
                 f"- accuracy: {_pct(metrics.get('accuracy'))}",
-                f"- wrong consensus rate: {_pct(metrics.get('wrong_consensus_rate'))}",
+                _wrong_line(metrics),
                 f"- correct-to-wrong flip rate: {_pct(metrics.get('correct_to_wrong_flip_rate'))}",
                 f"- parse failure rate: {_pct(metrics.get('parse_failure_rate'))}",
                 f"- mean answer diversity: {metrics.get('mean_answer_diversity', 0):.3f}",
@@ -40,12 +40,14 @@ def build_report(output_dir: str | Path) -> Path:
         )
         by_category = metrics.get("by_category", {})
         if by_category:
-            sections.append("| category | n | accuracy | wrong consensus |")
+            wrong_header = "wrong answer" if "wrong_answer_rate" in metrics else "wrong consensus"
+            wrong_key = "wrong_answer_rate" if "wrong_answer_rate" in metrics else "wrong_consensus_rate"
+            sections.append(f"| category | n | accuracy | {wrong_header} |")
             sections.append("| --- | ---: | ---: | ---: |")
             for category, row in by_category.items():
                 sections.append(
                     f"| {category} | {row.get('n', 0)} | {_pct(row.get('accuracy'))} | "
-                    f"{_pct(row.get('wrong_consensus_rate'))} |"
+                    f"{_pct(row.get(wrong_key))} |"
                 )
             sections.append("")
 
@@ -58,3 +60,9 @@ def _pct(value: Any) -> str:
         return f"{100.0 * float(value):.2f}%"
     except Exception:
         return "n/a"
+
+
+def _wrong_line(metrics: dict[str, Any]) -> str:
+    if "wrong_answer_rate" in metrics:
+        return f"- wrong answer rate: {_pct(metrics.get('wrong_answer_rate'))}"
+    return f"- wrong consensus rate: {_pct(metrics.get('wrong_consensus_rate'))}"

@@ -153,7 +153,12 @@ def _make_rollout(
     final_answers = [parse_answer(resp) for resp in final_responses]
     consensus, count = majority_answer(final_answers)
     correct = consensus == str(task.answer)
-    wrong_consensus = consensus is not None and count >= max(1, (len(final_answers) // 2) + 1) and not correct
+    wrong_consensus = (
+        len(final_answers) > 1
+        and consensus is not None
+        and count >= max(1, (len(final_answers) // 2) + 1)
+        and not correct
+    )
     correct_to_wrong = any(init == str(task.answer) and final != str(task.answer) for init, final in zip(initial_answers, final_answers))
     valid = [answer for answer in final_answers if answer is not None]
     diversity = len(set(valid)) / max(1, len(valid))

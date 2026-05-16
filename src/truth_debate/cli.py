@@ -8,6 +8,7 @@ from .data import build_datasets
 from .evaluate import run_evaluation
 from .preflight import download_model, run_preflight
 from .report import build_report
+from .rescore import rescore_run
 from .train_rl import run_rl_training
 
 
@@ -24,12 +25,19 @@ def main() -> None:
     p_download.add_argument("--local-dir", default=None)
     p_report = sub.add_parser("report")
     p_report.add_argument("--output", default="runs/debug")
+    p_rescore = sub.add_parser("rescore")
+    p_rescore.add_argument("--source", required=True, help="Run directory or zip archive to rescore")
+    p_rescore.add_argument("--output", default=None, help="Directory for rescored artifacts")
 
     args = parser.parse_args()
 
     if args.cmd == "report":
         report_path = build_report(args.output)
         print(f"Wrote {report_path}")
+        return
+
+    if args.cmd == "rescore":
+        rescore_run(args.source, args.output)
         return
 
     cfg = load_config(args.config)
