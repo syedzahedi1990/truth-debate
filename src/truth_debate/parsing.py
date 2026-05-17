@@ -7,6 +7,7 @@ import re
 INT_VALUE = r"([+-]?\d[\d,]*)"
 JSON_ANSWER_RE = re.compile(rf'"answer"\s*:\s*"?{INT_VALUE}"?', re.IGNORECASE)
 JSON_CONF_RE = re.compile(r'"confidence"\s*:\s*"?(\d+(?:\.\d+)?)"?', re.IGNORECASE)
+GSM8K_ANSWER_RE = re.compile(r"####\s*([+-]?\d[\d,]*(?:\.\d+)?)")
 ANSWER_RE = re.compile(rf"(?<![A-Za-z_])ANSWER\s*[:=]\s*(?:<integer>\s*[:=]?\s*)?\**\s*{INT_VALUE}", re.IGNORECASE)
 FINAL_RE = re.compile(
     rf"\bfinal\s+(?:answer|integer|result)\s*(?:(?:is|:|=)\s*)?(?:[:=]\s*)?(?:<integer>\s*[:=]?\s*)?\**\s*{INT_VALUE}",
@@ -21,6 +22,7 @@ MARKER_ONLY_RE = re.compile(
 NEXT_LINE_VALUE_RE = re.compile(rf"^\s*(?:[`'\"*_]+\s*)?{INT_VALUE}(?:\s*[`'\"*_.!,;]*)?\s*$")
 CONF_RE = re.compile(r"CONFIDENCE\s*[:=]\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
 INT_RE = re.compile(r"(?<![\w.])-?\d+(?![\w.])")
+NUMERIC_RE = re.compile(r"(?<![\w.])[+-]?\d[\d,]*(?:\.\d+)?(?!\w)")
 
 
 def parse_answer(text: str) -> str | None:
@@ -70,6 +72,29 @@ def parse_answer_legacy(text: str) -> str | None:
     if not ints:
         return None
     return normalize_int(ints[-1])
+
+
+def parse_standard_numeric_answer(text: str) -> str | None:
+    """Parse a benchmark-style numeric answer without changing strict metrics."""
+    strict = parse_answer(text)
+    if strict is not None:
+        return strict
+
+    marker = GSM8K_ANSWER_RE.search(text)
+    if marker:
+        return normalize_int(marker.group(1))
+
+    candidates: list[str] = []
+    for match in NUMERIC_RE.finditer(text):
+        if _numeric_match_is_confidence(text, match):
+            continue
+        try:
+            candidates.append(normalize_int(match.group(0)))
+        except ValueError:
+            continue
+    if not candidates:
+        return None
+    return candidates[-1]
 
 
 def normalize_int(value: str | int) -> str:
@@ -163,6 +188,18 @@ def _parse_json_confidence(text: str) -> float | None:
     if value > 1:
         value /= 100.0
     return max(0.0, min(1.0, value))
+
+
+def _numeric_match_is_confidence(text: str, match: re.Match[str]) -> bool:
+    start = text.rfind("\n", 0, match.start()) + 1
+    end = text.find("\n", match.end())
+    if end == -1:
+        end = len(text)
+    line = text[start:end].lower()
+    if "confidence" in line and not re.search(r"answer|final|result|####", line):
+        return True
+    tail = text[match.end() : match.end() + 1]
+    return tail == "%"
 
 
 def _json_objects(text: str) -> list[dict]:

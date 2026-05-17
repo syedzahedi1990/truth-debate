@@ -9,7 +9,7 @@ from truth_debate.curriculum import (
     wrong_majority_peers,
 )
 from truth_debate.data import Task, eval_left_to_right, safe_eval_expr
-from truth_debate.parsing import has_required_format, parse_answer, parse_confidence
+from truth_debate.parsing import has_required_format, parse_answer, parse_confidence, parse_standard_numeric_answer
 from truth_debate.rescore import rescore_run
 from truth_debate.reward import compute_reward
 
@@ -65,6 +65,9 @@ def test_strict_answer_parser_cases():
     assert parse_confidence('{"answer": -4408, "confidence": 0.91}') == 0.91
     assert has_required_format('{"answer": -4408, "confidence": 0.91}')
     assert parse_answer('{"answer": 20, "confidence": 0.8}\n{"answer": 14, "confidence": 0.9}') == "14"
+    assert parse_standard_numeric_answer("We compute carefully. Therefore the answer is 42.") == "42"
+    assert parse_standard_numeric_answer("CONFIDENCE: 100%") is None
+    assert parse_standard_numeric_answer("reasoning #### 915") == "915"
 
 
 def test_wrong_majority_curriculum_uses_plausible_wrong_answer():
@@ -154,3 +157,37 @@ def test_rescore_reads_zip_without_extracting(tmp_path):
     assert metrics["accuracy"] == 1.0
     assert metrics["wrong_answer_rate"] == 0.0
     assert metrics["parser_changed_rate"] == 1.0
+
+
+def test_rescore_reports_standard_numeric_gsm8k_metric(tmp_path):
+    row = {
+        "task_id": "gsm8k-test-00000",
+        "protocol": "single",
+        "question": "Problem: add 20 and 22",
+        "gold_answer": "42",
+        "category": "gsm8k",
+        "initial_responses": ["20 + 22 = 42."],
+        "final_responses": ["20 + 22 = 42."],
+        "initial_answers": [None],
+        "final_answers": [None],
+        "consensus_answer": None,
+        "consensus_count": 0,
+        "correct": False,
+        "wrong_consensus": False,
+        "correct_to_wrong_flip": False,
+        "answer_diversity": 0.0,
+        "rounds": [],
+        "meta": {"source": "gsm8k"},
+    }
+    zip_path = tmp_path / "gsm8k_run.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("run/baseline_rollouts/single.jsonl", json.dumps(row) + "\n")
+
+    out = tmp_path / "out"
+    rescore_run(zip_path, out)
+
+    metrics = json.loads((out / "rescored_metrics" / "baseline_single.json").read_text(encoding="utf-8"))
+    assert metrics["accuracy"] == 0.0
+    assert metrics["parse_failure_rate"] == 1.0
+    assert metrics["standard_numeric_accuracy"] == 1.0
+    assert metrics["standard_numeric_parse_failure_rate"] == 0.0

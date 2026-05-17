@@ -107,11 +107,39 @@ truth-debate rescore --source runs/v3_gsm8k_smoke --output runs/v3_gsm8k_smoke_r
 
 The synthetic benchmark is for controlled debugging. GSM8K is the standard benchmark sanity check; the smoke config uses a subset before a full benchmark run.
 
+## V4 Stable GSM8K Runs
+
+V3 showed that GSM8K training can collapse during RL even when the synthetic benchmark improves. V4 separates the diagnosis into a supervised-format run and a short anchored-RL run.
+
+First isolate whether supervised warmup alone improves GSM8K compliance:
+
+```bash
+truth-debate run --config configs/v4_gsm8k_sft_only.yaml --output runs/v4_gsm8k_sft_only
+truth-debate rescore --source runs/v4_gsm8k_sft_only --output runs/v4_gsm8k_sft_only_rescored
+```
+
+Then run the conservative RL variant:
+
+```bash
+truth-debate run --config configs/v4_gsm8k_stable_rl.yaml --output runs/v4_gsm8k_stable_rl
+truth-debate rescore --source runs/v4_gsm8k_stable_rl --output runs/v4_gsm8k_stable_rl_rescored
+```
+
+The v4 RL config saves `post_sft_adapter` and checkpoints every 10 RL steps. To evaluate a specific checkpoint:
+
+```bash
+truth-debate eval --config configs/v4_gsm8k_stable_rl.yaml --output runs/v4_gsm8k_stable_rl --label step20 --adapter-path runs/v4_gsm8k_stable_rl/checkpoints/step_000020
+truth-debate rescore --source runs/v4_gsm8k_stable_rl --output runs/v4_gsm8k_stable_rl_rescored_step20
+```
+
+For GSM8K reports, strict JSON accuracy remains the primary protocol-compliance metric. Reports also include `standard numeric accuracy`, which extracts the final numeric answer in the usual benchmark style so format failure can be separated from math failure.
+
 Useful subcommands:
 
 ```bash
 truth-debate make-data --config configs/quick.yaml --output runs/debug
 truth-debate eval --config configs/quick.yaml --output runs/debug
+truth-debate eval --config configs/quick.yaml --output runs/debug --label checkpoint --adapter-path runs/debug/checkpoints/step_000010
 truth-debate train --config configs/quick.yaml --output runs/debug
 truth-debate report --output runs/debug
 truth-debate rescore --source runs/my_run --output runs/my_run_rescored

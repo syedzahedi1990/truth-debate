@@ -7,12 +7,12 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable
 
-from .parsing import parse_answer, parse_answer_legacy
+from .parsing import parse_answer, parse_answer_legacy, parse_standard_numeric_answer
 from .reward import majority_answer
 
 
 PROTOCOL_ORDER = {"single": 0, "vanilla_debate": 1, "anti_conformity": 2}
-LABEL_ORDER = {"baseline": 0, "trained": 1}
+LABEL_ORDER = {"baseline": 0, "post_sft": 1, "trained": 2}
 
 
 def rescore_run(source: str | Path, output_dir: str | Path | None = None) -> Path:
@@ -165,6 +165,8 @@ def summarize_rescored_rollouts(rows: list[dict[str, Any]]) -> dict[str, Any]:
         summary["wrong_answer_rate"] = _mean_bool(rows, "wrong_answer")
     else:
         summary["wrong_consensus_rate"] = _mean_bool(rows, "wrong_consensus")
+    if _has_standard_numeric_rows(rows):
+        summary.update(_standard_numeric_summary(rows, is_single))
     return summary
 
 
@@ -268,6 +270,7 @@ def _metric_section(protocol: str, metrics: dict[str, Any]) -> list[str]:
         f"- accuracy: {_pct(metrics.get('accuracy'))}",
         wrong_line,
         f"- parse failure rate: {_pct(metrics.get('parse_failure_rate'))}",
+        *_standard_numeric_lines(metrics),
         f"- correct-to-wrong flip rate: {_pct(metrics.get('correct_to_wrong_flip_rate'))}",
         f"- parser changed rate: {_pct(metrics.get('parser_changed_rate'))}",
         f"- mean answer diversity: {metrics.get('mean_answer_diversity', 0.0):.3f}",
@@ -319,6 +322,8 @@ def _category_summary(rows: list[dict[str, Any]], is_single: bool) -> dict[str, 
         summary["wrong_answer_rate"] = _mean_bool(rows, "wrong_answer")
     else:
         summary["wrong_consensus_rate"] = _mean_bool(rows, "wrong_consensus")
+    if _has_standard_numeric_rows(rows):
+        summary.update(_standard_numeric_summary(rows, is_single))
     return summary
 
 
@@ -341,6 +346,34 @@ def _top_answers(rows: list[dict[str, Any]], limit: int = 10) -> list[dict[str, 
         value = answers[0] if len(answers) == 1 else consensus
         counts["parse_failure" if value is None else str(value)] += 1
     return [{"answer": answer, "count": count} for answer, count in counts.most_common(limit)]
+
+
+def _has_standard_numeric_rows(rows: list[dict[str, Any]]) -> bool:
+    return any(
+        str(row.get("category")) == "gsm8k" or row.get("meta", {}).get("source") == "gsm8k"
+        for row in rows
+    )
+
+
+def _standard_numeric_summary(rows: list[dict[str, Any]], is_single: bool) -> dict[str, Any]:
+    correct = 0
+    parse_failures = 0
+    response_count = 0
+    for row in rows:
+        answers = [parse_standard_numeric_answer(text) for text in row.get("final_responses", [])]
+        response_count += len(answers)
+        parse_failures += sum(1 for answer in answers if answer is None)
+        consensus, _count = majority_answer(answers)
+        gold = str(row.get("gold_answer"))
+        if is_single:
+            row_correct = bool(answers) and answers[0] == gold
+        else:
+            row_correct = consensus == gold
+        correct += 1 if row_correct else 0
+    return {
+        "standard_numeric_accuracy": correct / max(1, len(rows)),
+        "standard_numeric_parse_failure_rate": parse_failures / max(1, response_count),
+    }
 
 
 def _changed_examples(rows: list[dict[str, Any]], limit: int = 8) -> list[dict[str, Any]]:
@@ -415,6 +448,15 @@ def _format_top_answers(values: list[dict[str, Any]]) -> str:
     if not values:
         return "n/a"
     return ", ".join(f"{item['answer']} ({item['count']})" for item in values[:5])
+
+
+def _standard_numeric_lines(metrics: dict[str, Any]) -> list[str]:
+    if "standard_numeric_accuracy" not in metrics:
+        return []
+    return [
+        f"- standard numeric accuracy: {_pct(metrics.get('standard_numeric_accuracy'))}",
+        f"- standard numeric parse failure rate: {_pct(metrics.get('standard_numeric_parse_failure_rate'))}",
+    ]
 
 
 def _pct(value: Any) -> str:

@@ -57,6 +57,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "grad_clip": 1.0,
         "baseline_ema": 0.95,
         "save_every": 50,
+        "save_post_sft": True,
+        "sft_anchor_weight": 0.0,
+        "advantage_clip": None,
         "lora": {
             "r": 8,
             "alpha": 16,
@@ -80,7 +83,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
             },
         },
     },
-    "evaluation": {"max_tasks": None},
+    "evaluation": {
+        "max_tasks": None,
+        "evaluate_post_sft": False,
+        "evaluate_trained": True,
+    },
 }
 
 

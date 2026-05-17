@@ -16,10 +16,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Truth-seeking multi-agent debate experiments")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
+    command_parsers = {}
     for name in ["run", "make-data", "eval", "train", "preflight"]:
         p = sub.add_parser(name)
         p.add_argument("--config", default="configs/quick.yaml")
         p.add_argument("--output", default="runs/debug")
+        command_parsers[name] = p
+    command_parsers["eval"].add_argument("--label", default="baseline")
+    command_parsers["eval"].add_argument("--adapter-path", default=None)
     p_download = sub.add_parser("download-model")
     p_download.add_argument("--config", default="configs/quick.yaml")
     p_download.add_argument("--local-dir", default=None)
@@ -62,7 +66,7 @@ def main() -> None:
         return
 
     if args.cmd == "eval":
-        run_evaluation(cfg, output, label="baseline")
+        run_evaluation(cfg, output, label=args.label, adapter_path=args.adapter_path)
         report_path = build_report(output)
         print(f"Wrote {report_path}")
         return
@@ -78,7 +82,11 @@ def main() -> None:
         adapter = None
         if bool(cfg["training"].get("enabled", True)):
             adapter = run_rl_training(cfg, output)
-            run_evaluation(cfg, output, label="trained", adapter_path=adapter)
+            post_sft_path = output / "checkpoints" / "post_sft_adapter"
+            if bool(cfg.get("evaluation", {}).get("evaluate_post_sft", False)) and post_sft_path.exists():
+                run_evaluation(cfg, output, label="post_sft", adapter_path=post_sft_path)
+            if bool(cfg.get("evaluation", {}).get("evaluate_trained", True)):
+                run_evaluation(cfg, output, label="trained", adapter_path=adapter)
         report_path = build_report(output)
         print(f"Wrote {report_path}")
         return

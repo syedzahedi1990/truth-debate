@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
+from .parsing import parse_standard_numeric_answer
+from .reward import majority_answer
+
 
 def summarize_rollouts(rollouts: list[Any]) -> dict[str, Any]:
     rows = [r if isinstance(r, dict) else r.__dict__ for r in rollouts]
@@ -37,6 +40,8 @@ def summarize_rollouts(rollouts: list[Any]) -> dict[str, Any]:
         summary["wrong_answer_rate"] = _wrong_answer_rate(rows)
     else:
         summary["wrong_consensus_rate"] = mean_bool("wrong_consensus")
+    if _has_standard_numeric_rows(rows):
+        summary.update(_standard_numeric_summary(rows, is_single))
     return summary
 
 
@@ -72,4 +77,34 @@ def _category_summary(rows: list[dict[str, Any]], is_single: bool) -> dict[str, 
         summary["wrong_answer_rate"] = _wrong_answer_rate(rows)
     else:
         summary["wrong_consensus_rate"] = sum(1.0 for row in rows if row.get("wrong_consensus")) / len(rows)
+    if _has_standard_numeric_rows(rows):
+        summary.update(_standard_numeric_summary(rows, is_single))
     return summary
+
+
+def _has_standard_numeric_rows(rows: list[dict[str, Any]]) -> bool:
+    return any(
+        str(row.get("category")) == "gsm8k" or row.get("meta", {}).get("source") == "gsm8k"
+        for row in rows
+    )
+
+
+def _standard_numeric_summary(rows: list[dict[str, Any]], is_single: bool) -> dict[str, Any]:
+    correct = 0
+    parse_failures = 0
+    response_count = 0
+    for row in rows:
+        answers = [parse_standard_numeric_answer(text) for text in row.get("final_responses", [])]
+        response_count += len(answers)
+        parse_failures += sum(1 for answer in answers if answer is None)
+        consensus, _count = majority_answer(answers)
+        gold = str(row.get("gold_answer"))
+        if is_single:
+            row_correct = bool(answers) and answers[0] == gold
+        else:
+            row_correct = consensus == gold
+        correct += 1 if row_correct else 0
+    return {
+        "standard_numeric_accuracy": correct / max(1, len(rows)),
+        "standard_numeric_parse_failure_rate": parse_failures / max(1, response_count),
+    }

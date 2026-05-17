@@ -43,6 +43,8 @@ def run_rl_training(cfg: dict[str, Any], output_dir: str | Path) -> Path:
     batch_size = int(train_cfg["batch_size"])
     n_agents = int(cfg["debate"]["agents"])
     use_curriculum = curriculum_enabled(cfg)
+    sft_anchor_weight = float(train_cfg.get("sft_anchor_weight", 0.0))
+    advantage_clip = train_cfg.get("advantage_clip")
 
     warmup_steps = int(train_cfg.get("sft_warmup_steps", 0))
     if warmup_steps > 0:
@@ -56,6 +58,8 @@ def run_rl_training(cfg: dict[str, Any], output_dir: str | Path) -> Path:
             rng=rng,
             steps=warmup_steps,
         )
+        if bool(train_cfg.get("save_post_sft", True)):
+            model.save_adapter(output / "checkpoints" / "post_sft_adapter")
 
     with open(log_path, "w", encoding="utf-8") as log_f:
         for step in trange(1, int(train_cfg["steps"]) + 1, desc="rl-train"):
@@ -108,7 +112,8 @@ def run_rl_training(cfg: dict[str, Any], output_dir: str | Path) -> Path:
 
                 reward = compute_reward(task, final_response, peers, own_initial, cfg["reward"])
                 logprob, n_tokens = model.sequence_logprob(final_prompt, final_response)
-                advantage = reward.total - baseline
+                raw_advantage = reward.total - baseline
+                advantage = _clip_advantage(raw_advantage, advantage_clip)
                 loss = -float(advantage) * (logprob / max(1, n_tokens))
                 batch_losses.append(loss)
                 batch_rewards.append(float(reward.total))
@@ -122,13 +127,26 @@ def run_rl_training(cfg: dict[str, Any], output_dir: str | Path) -> Path:
                         "final_response": final_response,
                         "reward": asdict(reward),
                         "advantage": float(advantage),
+                        "raw_advantage": float(raw_advantage),
                         "tokens": n_tokens,
                         "wrong_majority_curriculum": use_curriculum,
                         "curriculum_mode": curriculum_mode,
                     }
                 )
 
-            total_loss = sum(batch_losses) / len(batch_losses)
+            policy_loss = sum(batch_losses) / len(batch_losses)
+            anchor_loss = None
+            if sft_anchor_weight > 0:
+                anchor_loss = supervised_anchor_loss(
+                    cfg=cfg,
+                    model=model,
+                    tasks=tasks,
+                    rng=rng,
+                    batch_size=batch_size,
+                )
+                total_loss = policy_loss + (sft_anchor_weight * anchor_loss)
+            else:
+                total_loss = policy_loss
             total_loss.backward()
             torch.nn.utils.clip_grad_norm_(trainable, float(train_cfg["grad_clip"]))
             optimizer.step()
@@ -137,6 +155,11 @@ def run_rl_training(cfg: dict[str, Any], output_dir: str | Path) -> Path:
             baseline = baseline_ema * baseline + (1.0 - baseline_ema) * mean_reward
             for event in batch_events:
                 event["loss"] = float(total_loss.detach().cpu().item())
+                event["policy_loss"] = float(policy_loss.detach().cpu().item())
+                event["sft_anchor_loss"] = (
+                    float(anchor_loss.detach().cpu().item()) if anchor_loss is not None else None
+                )
+                event["sft_anchor_weight"] = float(sft_anchor_weight)
                 event["mean_reward"] = float(mean_reward)
                 event["baseline"] = float(baseline)
                 log_f.write(json.dumps(event, sort_keys=True) + "\n")
@@ -148,6 +171,33 @@ def run_rl_training(cfg: dict[str, Any], output_dir: str | Path) -> Path:
     final_path = output / "checkpoints" / "final_adapter"
     model.save_adapter(final_path)
     return final_path
+
+
+def supervised_anchor_loss(
+    cfg: dict[str, Any],
+    model: HFGenerator,
+    tasks: list[Any],
+    rng: random.Random,
+    batch_size: int,
+) -> Any:
+    n_peers = max(0, int(cfg["debate"]["agents"]) - 1)
+    losses = []
+    for _ in range(batch_size):
+        task = rng.choice(tasks)
+        messages, completion = rng.choice(supervised_examples(task, n_peers, rng))
+        prompt = model.format_messages(messages)
+        logprob, n_tokens = model.sequence_logprob(prompt, completion)
+        losses.append(-(logprob / max(1, n_tokens)))
+    return sum(losses) / len(losses)
+
+
+def _clip_advantage(value: float, clip: Any) -> float:
+    if clip is None:
+        return float(value)
+    limit = abs(float(clip))
+    if limit <= 0:
+        return 0.0
+    return max(-limit, min(limit, float(value)))
 
 
 def run_sft_warmup(

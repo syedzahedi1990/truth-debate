@@ -34,6 +34,7 @@ def build_report(output_dir: str | Path) -> Path:
                 _wrong_line(metrics),
                 f"- correct-to-wrong flip rate: {_pct(metrics.get('correct_to_wrong_flip_rate'))}",
                 f"- parse failure rate: {_pct(metrics.get('parse_failure_rate'))}",
+                *_standard_numeric_lines(metrics),
                 f"- mean answer diversity: {metrics.get('mean_answer_diversity', 0):.3f}",
                 "",
             ]
@@ -66,3 +67,12 @@ def _wrong_line(metrics: dict[str, Any]) -> str:
     if "wrong_answer_rate" in metrics:
         return f"- wrong answer rate: {_pct(metrics.get('wrong_answer_rate'))}"
     return f"- wrong consensus rate: {_pct(metrics.get('wrong_consensus_rate'))}"
+
+
+def _standard_numeric_lines(metrics: dict[str, Any]) -> list[str]:
+    if "standard_numeric_accuracy" not in metrics:
+        return []
+    return [
+        f"- standard numeric accuracy: {_pct(metrics.get('standard_numeric_accuracy'))}",
+        f"- standard numeric parse failure rate: {_pct(metrics.get('standard_numeric_parse_failure_rate'))}",
+    ]
