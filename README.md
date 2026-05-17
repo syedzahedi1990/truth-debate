@@ -134,6 +134,26 @@ truth-debate rescore --source runs/v4_gsm8k_stable_rl --output runs/v4_gsm8k_sta
 
 For GSM8K reports, strict JSON accuracy remains the primary protocol-compliance metric. Reports also include `standard numeric accuracy`, which extracts the final numeric answer in the usual benchmark style so format failure can be separated from math failure.
 
+## V5 Stronger GSM8K Runs
+
+The v4 SFT-only run showed that the 0.5B model learned JSON compliance but lost GSM8K numeric accuracy. V5 switches to `Qwen/Qwen2.5-1.5B-Instruct`, uses much lighter SFT, and lets RL rewards use standard numeric answer parsing while reports still separate strict JSON accuracy from benchmark-style numeric accuracy.
+
+Run the lighter SFT-only diagnosis first:
+
+```bash
+truth-debate run --config configs/v5_gsm8k_light_sft_1_5b.yaml --output runs/v5_gsm8k_light_sft_1_5b
+truth-debate rescore --source runs/v5_gsm8k_light_sft_1_5b --output runs/v5_gsm8k_light_sft_1_5b_rescored
+```
+
+Only run anchored RL if the post-SFT standard numeric accuracy is at least close to the baseline numeric accuracy:
+
+```bash
+truth-debate run --config configs/v5_gsm8k_stable_rl_1_5b.yaml --output runs/v5_gsm8k_stable_rl_1_5b
+truth-debate rescore --source runs/v5_gsm8k_stable_rl_1_5b --output runs/v5_gsm8k_stable_rl_1_5b_rescored
+```
+
+The v5 RL config checkpoints every 10 RL steps and uses `reward.answer_parse_mode: standard_numeric`, so the RL signal rewards correct GSM8K answers even if the output is not perfect JSON. The separate strict parse metrics still show whether the protocol-compliance story holds.
+
 Useful subcommands:
 
 ```bash

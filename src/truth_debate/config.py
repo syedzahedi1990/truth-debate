@@ -47,6 +47,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "correct_to_wrong_flip": -0.7,
         "format_bonus": 0.05,
         "confidence_calibration": 0.1,
+        "answer_parse_mode": "strict",
     },
     "training": {
         "enabled": True,

@@ -51,6 +51,39 @@ def test_reward_escape_wrong_majority():
     assert reward.total > 1.0
 
 
+def test_reward_can_use_standard_numeric_answer_mode():
+    task = Task(
+        id="gsm8k-mini",
+        question="Problem: What is 20 + 22?",
+        answer="42",
+        category="gsm8k",
+        meta={"source": "gsm8k"},
+    )
+    cfg = {
+        "correct": 1.0,
+        "wrong": -0.2,
+        "parse_failure": -0.5,
+        "escape_wrong_majority": 0.6,
+        "join_wrong_majority": -0.5,
+        "correct_to_wrong_flip": -0.8,
+        "format_bonus": 0.05,
+        "confidence_calibration": 0.0,
+        "answer_parse_mode": "standard_numeric",
+    }
+    reward = compute_reward(
+        task=task,
+        final_response="20 + 22 = 42.",
+        peer_responses=["20 + 22 = 40.", "20 + 22 = 40."],
+        own_initial_response="I get 42.",
+        reward_cfg=cfg,
+    )
+
+    assert reward.parsed_answer == "42"
+    assert reward.answer_parse_mode == "standard_numeric"
+    assert reward.correct_component == 1.0
+    assert reward.anti_conformity_component > 0
+
+
 def test_strict_answer_parser_cases():
     assert parse_answer("ANSWER: -4408") == "-4408"
     assert parse_answer("Final answer is **40**") == "40"

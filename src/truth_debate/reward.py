@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .data import Task
-from .parsing import has_required_format, parse_answer, parse_confidence
+from .parsing import has_required_format, parse_answer, parse_confidence, parse_standard_numeric_answer
 
 
 @dataclass
@@ -18,6 +18,7 @@ class RewardBreakdown:
     parsed_answer: str | None
     majority_answer: str | None
     majority_is_wrong: bool
+    answer_parse_mode: str
 
 
 def majority_answer(answers: list[str | None]) -> tuple[str | None, int]:
@@ -40,8 +41,10 @@ def compute_reward(
     reward_cfg: dict[str, Any],
 ) -> RewardBreakdown:
     gold = str(task.answer)
-    parsed_final = parse_answer(final_response)
-    peer_answers = [parse_answer(resp) for resp in peer_responses]
+    answer_parse_mode = str(reward_cfg.get("answer_parse_mode", "strict"))
+    answer_parser = _answer_parser(answer_parse_mode)
+    parsed_final = answer_parser(final_response)
+    peer_answers = [answer_parser(resp) for resp in peer_responses]
     maj_answer, maj_count = majority_answer(peer_answers)
     majority_is_wrong = maj_answer is not None and maj_count >= 2 and maj_answer != gold
 
@@ -60,7 +63,7 @@ def compute_reward(
 
     flip_component = 0.0
     if own_initial_response is not None:
-        own_initial = parse_answer(own_initial_response)
+        own_initial = answer_parser(own_initial_response)
         if own_initial == gold and parsed_final not in (gold, None):
             flip_component += float(reward_cfg["correct_to_wrong_flip"])
 
@@ -86,4 +89,13 @@ def compute_reward(
         parsed_answer=parsed_final,
         majority_answer=maj_answer,
         majority_is_wrong=bool(majority_is_wrong),
+        answer_parse_mode=answer_parse_mode,
     )
+
+
+def _answer_parser(parse_mode: str):
+    if parse_mode == "strict":
+        return parse_answer
+    if parse_mode == "standard_numeric":
+        return parse_standard_numeric_answer
+    raise ValueError(f"Unknown reward.answer_parse_mode: {parse_mode}")

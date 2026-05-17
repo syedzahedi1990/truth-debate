@@ -188,6 +188,7 @@ def summarize_reward_log(source: RunSource) -> dict[str, Any] | None:
     anti = [float(row.get("anti_conformity_component", 0.0)) for row in rewards]
     totals = [float(row.get("total", 0.0)) for row in rewards]
     correct = [float(row.get("correct_component", 0.0)) for row in rewards]
+    parse_modes = Counter(str(row.get("answer_parse_mode", "unknown")) for row in rewards)
     buckets: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for row in rewards:
         step = int(row.get("step") or 0)
@@ -200,6 +201,7 @@ def summarize_reward_log(source: RunSource) -> dict[str, Any] | None:
         "mean_correct_component": statistics.mean(correct),
         "mean_anti_conformity_component": statistics.mean(anti),
         "anti_conformity_nonzero_rate": sum(1 for value in anti if value != 0.0) / len(anti),
+        "answer_parse_modes": dict(parse_modes),
         "by_100_step_bucket": {
             str(bucket): {
                 "n": len(items),
@@ -244,6 +246,7 @@ def build_rescored_report(
                 f"- mean correctness component: {reward_summary['mean_correct_component']:.4f}",
                 f"- mean anti-conformity component: {reward_summary['mean_anti_conformity_component']:.4f}",
                 f"- anti-conformity nonzero rate: {_pct(reward_summary['anti_conformity_nonzero_rate'])}",
+                f"- answer parse modes: {_format_counts(reward_summary.get('answer_parse_modes', {}))}",
                 "",
             ]
         )
@@ -448,6 +451,12 @@ def _format_top_answers(values: list[dict[str, Any]]) -> str:
     if not values:
         return "n/a"
     return ", ".join(f"{item['answer']} ({item['count']})" for item in values[:5])
+
+
+def _format_counts(values: dict[str, Any]) -> str:
+    if not values:
+        return "n/a"
+    return ", ".join(f"{key} ({value})" for key, value in sorted(values.items()))
 
 
 def _standard_numeric_lines(metrics: dict[str, Any]) -> list[str]:
