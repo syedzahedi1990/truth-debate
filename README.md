@@ -174,6 +174,25 @@ truth-debate rescore --source runs/v6_gsm8k_no_sft_rl_1_5b --output runs/v6_gsm8
 
 The no-SFT RL run starts from the base model rather than a supervised checkpoint. It uses `reward.answer_parse_mode: standard_numeric`, a small learning rate, advantage clipping, and checkpoints every 5 RL steps.
 
+## V7 Step-5 Multi-Seed Validation
+
+The v6 checkpoint sweep found that step 5 was the best balanced checkpoint: it preserved vanilla-debate accuracy, slightly improved anti-conformity accuracy, and reduced anti-conformity wrong consensus without parse collapse. V7 validates that exact 5-step setup across three seeds.
+
+Run all seeds on Vast:
+
+```bash
+bash scripts/run_v7_multiseed.sh
+```
+
+This writes:
+
+- `runs/v7_gsm8k_step5_seed1618_1_5b`
+- `runs/v7_gsm8k_step5_seed2718_1_5b`
+- `runs/v7_gsm8k_step5_seed3141_1_5b`
+- matching `_rescored` directories
+
+The validation target is not high absolute GSM8K accuracy yet. The target is a stable direction of effect: trained anti-conformity should reduce wrong consensus without parse failures, and vanilla debate should not suffer a large accuracy drop.
+
 Useful subcommands:
 
 ```bash
