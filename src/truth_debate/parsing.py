@@ -8,6 +8,7 @@ INT_VALUE = r"([+-]?\d[\d,]*)"
 JSON_ANSWER_RE = re.compile(rf'"answer"\s*:\s*"?{INT_VALUE}"?', re.IGNORECASE)
 JSON_CONF_RE = re.compile(r'"confidence"\s*:\s*"?(\d+(?:\.\d+)?)"?', re.IGNORECASE)
 GSM8K_ANSWER_RE = re.compile(r"####\s*([+-]?\d[\d,]*(?:\.\d+)?)")
+JSON_KEY_VALUE_RE = re.compile(r'\s*:\s*"?([+-]?\d[\d,]*(?:\.\d+)?)"?')
 ANSWER_RE = re.compile(rf"(?<![A-Za-z_])ANSWER\s*[:=]\s*(?:<integer>\s*[:=]?\s*)?\**\s*{INT_VALUE}", re.IGNORECASE)
 FINAL_RE = re.compile(
     rf"\bfinal\s+(?:answer|integer|result)\s*(?:(?:is|:|=)\s*)?(?:[:=]\s*)?(?:<integer>\s*[:=]?\s*)?\**\s*{INT_VALUE}",
@@ -161,10 +162,7 @@ def _parse_json_answer(text: str) -> str | None:
                 pass
     if parsed_answers:
         return parsed_answers[-1]
-    matches = JSON_ANSWER_RE.findall(text)
-    if matches:
-        return normalize_int(matches[-1])
-    return None
+    return _parse_top_level_json_answer_key(text)
 
 
 def _parse_json_confidence(text: str) -> float | None:
@@ -200,6 +198,48 @@ def _numeric_match_is_confidence(text: str, match: re.Match[str]) -> bool:
         return True
     tail = text[match.end() : match.end() + 1]
     return tail == "%"
+
+
+def _parse_top_level_json_answer_key(text: str) -> str | None:
+    values: list[str] = []
+    depth = 0
+    in_string = False
+    escaped = False
+    i = 0
+    while i < len(text):
+        char = text[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if char == "{":
+            depth += 1
+            i += 1
+            continue
+        if char == "}":
+            depth = max(0, depth - 1)
+            i += 1
+            continue
+        if depth == 1 and text.startswith('"answer"', i):
+            match = JSON_KEY_VALUE_RE.match(text, i + len('"answer"'))
+            if match:
+                try:
+                    values.append(normalize_int(match.group(1)))
+                except ValueError:
+                    pass
+                i = match.end()
+                continue
+        if char == '"':
+            in_string = True
+        i += 1
+
+    return values[-1] if values else None
 
 
 def _json_objects(text: str) -> list[dict]:

@@ -154,6 +154,26 @@ truth-debate rescore --source runs/v5_gsm8k_stable_rl_1_5b --output runs/v5_gsm8
 
 The v5 RL config checkpoints every 10 RL steps and uses `reward.answer_parse_mode: standard_numeric`, so the RL signal rewards correct GSM8K answers even if the output is not perfect JSON. The separate strict parse metrics still show whether the protocol-compliance story holds.
 
+## V6 Hardened Anti-Conformity Runs
+
+V5 showed that the 1.5B baseline is usable, but anti-conformity sometimes emits nested or truncated JSON. V6 hardens the anti-conformity prompts to require flat JSON with `answer` as the first key, and keeps RL off until the new baseline is inspected.
+
+Run the baseline-only check first:
+
+```bash
+truth-debate run --config configs/v6_gsm8k_baseline_1_5b.yaml --output runs/v6_gsm8k_baseline_1_5b
+truth-debate rescore --source runs/v6_gsm8k_baseline_1_5b --output runs/v6_gsm8k_baseline_1_5b_rescored
+```
+
+Then, only if the hardened baseline preserves the v5 vanilla-debate signal and reduces anti-conformity parse failures, run the no-SFT RL variant:
+
+```bash
+truth-debate run --config configs/v6_gsm8k_no_sft_rl_1_5b.yaml --output runs/v6_gsm8k_no_sft_rl_1_5b
+truth-debate rescore --source runs/v6_gsm8k_no_sft_rl_1_5b --output runs/v6_gsm8k_no_sft_rl_1_5b_rescored
+```
+
+The no-SFT RL run starts from the base model rather than a supervised checkpoint. It uses `reward.answer_parse_mode: standard_numeric`, a small learning rate, advantage clipping, and checkpoints every 5 RL steps.
+
 Useful subcommands:
 
 ```bash

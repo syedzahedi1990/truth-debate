@@ -7,7 +7,8 @@ from .data import Task
 
 SYSTEM = (
     "You are a careful mathematical debater. Your goal is truth, not agreement. "
-    "Use concise reasoning. Return exactly one JSON object and no Markdown. "
+    "Use concise reasoning. Return exactly one flat JSON object and no Markdown. "
+    "Do not use nested JSON objects, arrays, code fences, or extra text. "
     'The JSON must include "answer" as an integer and "confidence" as a number from 0 to 1.'
 )
 
@@ -65,9 +66,12 @@ def anti_conformity_update_messages(
                 f"Task:\n{task.question}\n\n"
                 f"Your private commitment:\n{own_commitment}\n\n"
                 f"Peer commitments and arguments:\n{peers}\n\n"
-                "Respond as exactly one JSON object with these keys: "
-                '"private_answer", "majority_risk", "error_check", "minority_report", "answer", "confidence". '
-                '"answer" must be an integer and "confidence" must be a number from 0 to 1.'
+                "Respond as exactly one flat JSON object with no nested objects or arrays. "
+                "The first key must be \"answer\". Use exactly this shape: "
+                '{"answer": <integer>, "confidence": <0-1>, "private_answer": <integer>, '
+                '"majority_risk": "<short text>", "error_check": "<short text>", '
+                '"minority_report": "<short text>"}. '
+                "Keep every text field under 20 words."
             ),
         },
     ]
@@ -86,9 +90,12 @@ def rl_final_messages(task: Task, own_commitment: str, peer_messages: list[str])
                 f"Task:\n{task.question}\n\n"
                 f"Your private commitment:\n{own_commitment}\n\n"
                 f"Peer answers:\n{peers}\n\n"
-                "Now produce exactly one JSON object with keys "
-                '"private_answer", "majority_risk", "error_check", "minority_report", "answer", "confidence". '
-                '"answer" must be an integer and "confidence" must be a number from 0 to 1.'
+                "Now produce exactly one flat JSON object with no nested objects or arrays. "
+                "The first key must be \"answer\". Use exactly this shape: "
+                '{"answer": <integer>, "confidence": <0-1>, "private_answer": <integer>, '
+                '"majority_risk": "<short text>", "error_check": "<short text>", '
+                '"minority_report": "<short text>"}. '
+                "Keep every text field under 20 words."
             ),
         },
     ]
@@ -119,12 +126,12 @@ def json_anti_conformity_answer(
 ) -> str:
     return json.dumps(
         {
+            "answer": int(answer),
+            "confidence": round(float(confidence), 4),
             "private_answer": int(private_answer),
             "majority_risk": "the peer majority may be using a precedence or arithmetic shortcut",
             "error_check": "recompute multiplication before addition and subtraction",
             "minority_report": f"wrong majority answer was {int(wrong_majority_answer)}",
-            "answer": int(answer),
-            "confidence": round(float(confidence), 4),
         },
         separators=(",", ":"),
     )

@@ -10,6 +10,7 @@ from truth_debate.curriculum import (
 )
 from truth_debate.data import Task, eval_left_to_right, safe_eval_expr
 from truth_debate.parsing import has_required_format, parse_answer, parse_confidence, parse_standard_numeric_answer
+from truth_debate.prompts import json_anti_conformity_answer
 from truth_debate.rescore import rescore_run
 from truth_debate.reward import compute_reward
 
@@ -101,6 +102,24 @@ def test_strict_answer_parser_cases():
     assert parse_standard_numeric_answer("We compute carefully. Therefore the answer is 42.") == "42"
     assert parse_standard_numeric_answer("CONFIDENCE: 100%") is None
     assert parse_standard_numeric_answer("reasoning #### 915") == "915"
+
+
+def test_parser_prefers_top_level_json_answer_key():
+    malformed = (
+        "```json\n"
+        '{"private_answer": 8, "error_check": {"peer_1": {"answer": 4}}, '
+        '"minority_report": {"answer": 5}, "answer": 8, "confidence": 0.95'
+    )
+    nested_only = '{"private_answer": 8, "error_check": {"peer_1": {"answer": 4}}, "confidence": 0.95'
+
+    assert parse_answer(malformed) == "8"
+    assert parse_answer(nested_only) is None
+
+
+def test_anti_conformity_supervised_answer_starts_with_answer_key():
+    completion = json_anti_conformity_answer(answer=14, private_answer=14, wrong_majority_answer=20)
+    assert completion.startswith('{"answer":14,"confidence":')
+    assert parse_answer(completion) == "14"
 
 
 def test_wrong_majority_curriculum_uses_plausible_wrong_answer():
