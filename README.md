@@ -193,6 +193,25 @@ This writes:
 
 The validation target is not high absolute GSM8K accuracy yet. The target is a stable direction of effect: trained anti-conformity should reduce wrong consensus without parse failures, and vanilla debate should not suffer a large accuracy drop.
 
+## V8 Larger Evaluation Of V7 Adapters
+
+V7 showed a small but consistent anti-conformity wrong-consensus reduction on 100-example smoke splits. V8 keeps the trained v7 step-5 adapters fixed and evaluates them on 500-example GSM8K subsets for each seed.
+
+Run this only after the v7 run directories exist:
+
+```bash
+bash scripts/run_v8_eval500_v7_adapters.sh
+```
+
+This writes:
+
+- `runs/v8_gsm8k_eval500_seed1618_1_5b`
+- `runs/v8_gsm8k_eval500_seed2718_1_5b`
+- `runs/v8_gsm8k_eval500_seed3141_1_5b`
+- matching `_rescored` directories
+
+The success criterion is the same directional effect as V7, but on a less noisy evaluation: trained anti-conformity should reduce wrong consensus with 0% parse failure, while vanilla debate should not take a large accuracy hit.
+
 Useful subcommands:
 
 ```bash
